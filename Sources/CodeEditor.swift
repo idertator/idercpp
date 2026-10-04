@@ -14,13 +14,20 @@ struct CodeEditor: NSViewRepresentable {
     var onToggleBreakpoint: (Int) -> Void = { _ in }
     /// Symbols starting with the word being typed.
     var completions: (String) -> [String] = { _ in [] }
+    /// Vim-like modal editing, see VimEngine.swift.
+    var vim = false
+    var onVimMode: (String) -> Void = { _ in }
+    var onToggleVim: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSTextView.scrollableTextView()
-        let tv = scroll.documentView as! NSTextView
+        let scroll = EditorTextView.scrollableTextView()
+        let tv = scroll.documentView as! EditorTextView
         tv.delegate = context.coordinator
+        tv.vim.textView = tv
+        tv.vim.onModeChange = { [coordinator = context.coordinator] in coordinator.parent.onVimMode($0.rawValue) }
+        tv.onToggleVim = { [coordinator = context.coordinator] in coordinator.parent.onToggleVim() }
         tv.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         tv.isRichText = false
         tv.allowsUndo = true
@@ -40,16 +47,20 @@ struct CodeEditor: NSViewRepresentable {
         scroll.rulersVisible = true
 
         context.coordinator.rehighlight(tv)
+        tv.vim.isEnabled = vim
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.parent = self
-        let tv = scroll.documentView as! NSTextView
+        let tv = scroll.documentView as! EditorTextView
         let coordinator = context.coordinator
+        if tv.vim.isEnabled != vim { tv.vim.isEnabled = vim }
         let moved = coordinator.currentLine != currentLine
         if tv.string != text {
             tv.string = text
+            // Undo steps recorded for the previous text do not fit this one.
+            tv.undoManager?.removeAllActions()
             coordinator.rehighlight(tv)
         } else if coordinator.highlighted != highlight || coordinator.breakpoints != breakpoints || moved {
             coordinator.rehighlight(tv)
@@ -74,7 +85,9 @@ struct CodeEditor: NSViewRepresentable {
             rehighlight(tv)
             if typedIdentifier {
                 typedIdentifier = false
-                if tv.rangeForUserCompletion.length >= 2 {
+                // Vim's normal-mode edits (r, for one) are not typing.
+                let typing = (tv as? EditorTextView)?.vim.isInserting ?? true
+                if typing, tv.rangeForUserCompletion.length >= 2 {
                     DispatchQueue.main.async { tv.complete(nil) }
                 }
             }
@@ -128,6 +141,7 @@ struct CodeEditor: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
+            (tv as? EditorTextView)?.vim.updateCursor()
             let head = (tv.string as NSString).substring(to: tv.selectedRange().location)
             parent.onCursorLine(head.reduce(1) { $1.isNewline ? $0 + 1 : $0 })
         }

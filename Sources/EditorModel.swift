@@ -29,8 +29,7 @@ final class EditorModel: ObservableObject {
     @Published var isDirty = false
     @Published var output = ""
     @Published var isRunning = false
-    // Lives here rather than in a view @State: the SwiftUI macro plugin behind
-    // @State ships with Xcode only, not the Command Line Tools.
+    /// The line being typed in the console, not yet sent to the program.
     @Published var input = ""
 
     // Debugger state; the logic lives in Debugger.swift.
@@ -43,6 +42,15 @@ final class EditorModel: ObservableObject {
     @Published var selectedFrame: Int?
     @Published var variables: [DebugVariable] = []
     @Published var stoppedAt: SourceLine?
+    /// Vim-like modal editing, toggled with ⌃M and remembered between launches.
+    @Published var vimEnabled = UserDefaults.standard.bool(forKey: "vimEnabled") {
+        didSet {
+            UserDefaults.standard.set(vimEnabled, forKey: "vimEnabled")
+            vimMode = "NORMAL"
+        }
+    }
+    /// Shown in the window subtitle while Vim mode is on.
+    @Published var vimMode = "NORMAL"
     /// Kept up to date by the editor; not published, it changes on every cursor move.
     var cursorLine = 1
     /// Autocomplete index, see SymbolIndex.swift. Nil until something is opened or saved.
@@ -268,11 +276,44 @@ final class EditorModel: ObservableObject {
         }
     }
 
-    /// Sends a line to the running program's stdin.
-    func send(_ line: String) {
+    // MARK: - Console input
+
+    /// Text typed (or pasted) into the console. It collects in `input`; each
+    /// line break sends the line to the running program's stdin.
+    func typeInput(_ text: String) {
         guard isRunning, masterFD >= 0 else { return }
-        let bytes = Array((line + "\n").utf8)
-        _ = write(masterFD, bytes, bytes.count)
+        for character in text {
+            guard character.isNewline else {
+                input.append(character)
+                continue
+            }
+            let line = input + "\n"
+            input = ""
+            // The terminal does not echo (see quiet), so the line is shown here.
+            append(line)
+            let bytes = Array(line.utf8)
+            _ = write(masterFD, bytes, bytes.count)
+        }
+    }
+
+    func deleteInput() {
+        if !input.isEmpty { input.removeLast() }
+    }
+
+    /// ⌃D on an empty line: end of input, as in a terminal.
+    func sendEOF() {
+        guard isRunning, masterFD >= 0, input.isEmpty else { return }
+        let eof: [UInt8] = [4]
+        _ = write(masterFD, eof, 1)
+    }
+
+    /// Turns off the terminal's own echo: the console shows the input line
+    /// itself while it is typed, and echo would print it a second time.
+    nonisolated func quiet(_ terminal: Int32) {
+        var settings = termios()
+        guard tcgetattr(terminal, &settings) == 0 else { return }
+        settings.c_lflag &= ~tcflag_t(ECHO)
+        tcsetattr(terminal, TCSANOW, &settings)
     }
 
     func append(_ s: String) {
@@ -293,6 +334,8 @@ final class EditorModel: ObservableObject {
             append("openpty failed\n")
             return
         }
+        quiet(slave)
+        input = ""
         let tty = FileHandle(fileDescriptor: slave, closeOnDealloc: false)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: exe)
@@ -324,6 +367,7 @@ final class EditorModel: ObservableObject {
                 self.masterFD = -1
                 self.process = nil
                 self.isRunning = false
+                self.input = ""
                 done(!crashed && code == 0, crashed ? "killed by signal \(code)" : "exit \(code)")
             }
         }

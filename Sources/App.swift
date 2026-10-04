@@ -20,6 +20,10 @@ struct IderCppApp: App {
             CommandGroup(replacing: .saveItem) {
                 Button("Save") { model.save() }.keyboardShortcut("s")
             }
+            CommandGroup(after: .textEditing) {
+                Toggle("Vim Mode", isOn: $model.vimEnabled)
+                    .keyboardShortcut("m", modifiers: .control)
+            }
             CommandMenu("Build") {
                 Button("Compile") { model.build(andRun: false) }
                     .keyboardShortcut("b")

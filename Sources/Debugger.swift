@@ -89,6 +89,8 @@ extension EditorModel {
             return
         }
         let tty = String(cString: name)
+        quiet(slave)
+        input = ""
 
         let client = DAPClient()
         client.onEvent = { [weak self] event, body in self?.handleDebugEvent(event, body) }
@@ -163,6 +165,7 @@ extension EditorModel {
         guard isDebugging else { return }
         isDebugging = false
         isRunning = false
+        input = ""
         resumed()
         debugStatus = "Not running"
 

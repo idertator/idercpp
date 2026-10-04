@@ -3,8 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var model: EditorModel
 
-    private let mono = Font.system(size: 12, design: .monospaced)
-
     var body: some View {
         NavigationSplitView {
             sidebar
@@ -16,7 +14,10 @@ struct ContentView: View {
                     breakpoints: model.breakpointLines, currentLine: model.stoppedLine,
                     onCursorLine: { model.cursorLine = $0 },
                     onToggleBreakpoint: { model.toggleBreakpoint(at: $0) },
-                    completions: { model.completions(for: $0) }
+                    completions: { model.completions(for: $0) },
+                    vim: model.vimEnabled,
+                    onVimMode: { model.vimMode = $0 },
+                    onToggleVim: { model.vimEnabled.toggle() }
                 )
                 .frame(minHeight: 200)
                 console
@@ -28,6 +29,7 @@ struct ContentView: View {
             }
         }
         .navigationTitle(model.title)
+        .navigationSubtitle(model.vimEnabled ? model.vimMode : "")
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button { model.open() } label: { Label("Open", systemImage: "folder") }
@@ -75,31 +77,12 @@ struct ContentView: View {
     }
 
     private var console: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    Text(model.output)
-                        .font(mono)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(6)
-                        .id("end")
-                }
-                .onChange(of: model.output) {
-                    proxy.scrollTo("end", anchor: .bottom)
-                }
-            }
-            Divider()
-            TextField("stdin — press Return to send", text: $model.input)
-                .textFieldStyle(.plain)
-                .font(mono)
-                .padding(6)
-                .disabled(!model.isRunning)
-                .onSubmit {
-                    model.send(model.input)
-                    model.input = ""
-                }
-        }
-        .background(Color(nsColor: .textBackgroundColor))
+        ConsoleView(
+            output: model.output, input: model.input, isRunning: model.isRunning,
+            onText: { model.typeInput($0) },
+            onDelete: { model.deleteInput() },
+            onEOF: { model.sendEOF() },
+            onInterrupt: { model.stop() }
+        )
     }
 }

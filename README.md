@@ -11,6 +11,7 @@ It edits, compiles, runs and debugs C++ projects:
 - Compile and run with an interactive terminal pane, so `cin` works
 - Debugging through `lldb-dap`: breakpoints, stepping, call stack, locals
 - Autocompletion from a binary symbol index, no language server
+- Smart indentation with four spaces
 - Optional Vim-style modal editing
 
 ## Requirements
@@ -122,6 +123,7 @@ Press **⌘?**, or `?` in Vim normal mode or an idle terminal, for the full list
 | `Sources/EditorModel.swift` | Files, projects, compile and run |
 | `Sources/CodeEditor.swift` | The text editor |
 | `Sources/CppHighlighter.swift` | Syntax highlighting |
+| `Sources/SmartIndent.swift` | Indentation rules |
 | `Sources/LineNumberGutter.swift` | Line numbers and breakpoint clicks |
 | `Sources/ConsoleView.swift` | Terminal pane |
 | `Sources/Debugger.swift`, `DAPClient.swift`, `DebugSidebar.swift` | Debugging through `lldb-dap` |

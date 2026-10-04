@@ -52,8 +52,11 @@ struct HelpContent: View {
             ("F6  F7  F8", "Step over, into, out"),
         ]),
         Section(title: "Editor", rows: [
-            ("Tab", "Insert four spaces"),
-            ("Return", "New line, keeping the indentation"),
+            ("Tab", "Indent to the next 4-space stop, or indent the selected lines"),
+            ("⇧Tab", "Remove one level from the selected lines"),
+            ("Return", "New line, keeping the indentation, one level deeper after { ( ["),
+            ("}", "On a blank line, lines up with its {"),
+            ("Delete", "In the leading spaces, back one level"),
             ("Typing a word", "Autocomplete list from 2 letters: ↑ ↓ pick, Return or Tab insert, Esc close"),
             ("⌃M", "Turn Vim mode on or off"),
             ("?", "This help, see below"),

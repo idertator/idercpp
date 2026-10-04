@@ -14,6 +14,16 @@ final class EditorTextView: NSTextView {
         if vim.handle(event) { return }
         super.keyDown(with: event)
     }
+
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        // A closing brace lines up with its opening one, see SmartIndent.swift.
+        let range = replacementRange.location == NSNotFound ? selectedRange() : replacementRange
+        if string as? String == "}", let edit = SmartIndent.closingBrace(in: self.string as NSString, selection: range) {
+            super.insertText(edit.string, replacementRange: edit.range)
+            return
+        }
+        super.insertText(string, replacementRange: replacementRange)
+    }
 }
 
 /// Vim-like modal editing: a deliberately small subset of Vim.
@@ -189,7 +199,7 @@ final class VimEngine {
             setMode(.insert)
         case "o":
             let end = lineEnd(position)
-            let indent = indentation(at: position)
+            let indent = SmartIndent.indentation(in: text, after: end)
             replace(NSRange(location: end, length: 0), with: "\n" + indent, cursor: end + 1 + indent.utf16.count)
             setMode(.insert)
         case "O":

@@ -159,21 +159,37 @@ struct CodeEditor: NSViewRepresentable {
         }
 
         func textView(_ tv: NSTextView, doCommandBy selector: Selector) -> Bool {
+            // Indentation, see SmartIndent.swift.
             let sel = tv.selectedRange()
-            if selector == #selector(NSResponder.insertTab(_:)) {
-                tv.insertText("    ", replacementRange: sel)
+            let text = tv.string as NSString
+            let edit: SmartIndent.Edit?
+            switch selector {
+            case #selector(NSResponder.insertNewline(_:)):
+                edit = SmartIndent.newline(in: text, selection: sel)
+            case #selector(NSResponder.insertTab(_:)):
+                edit = SmartIndent.tab(in: text, selection: sel)
+            case #selector(NSResponder.insertBacktab(_:)):
+                // Consumed even with nothing to remove: the default moves the focus away.
+                apply(SmartIndent.shift(in: text, selection: sel, outdent: true), to: tv)
                 return true
+            case #selector(NSResponder.deleteBackward(_:)):
+                edit = SmartIndent.backspace(in: text, selection: sel)
+            default:
+                return false
             }
-            if selector == #selector(NSResponder.insertNewline(_:)) {
-                // Carry the current line's indentation onto the new line.
-                let s = tv.string as NSString
-                let lineStart = s.lineRange(for: NSRange(location: sel.location, length: 0)).location
-                let head = s.substring(with: NSRange(location: lineStart, length: sel.location - lineStart))
-                let indent = head.prefix { $0 == " " || $0 == "\t" }
-                tv.insertText("\n" + indent, replacementRange: sel)
-                return true
-            }
-            return false
+            return apply(edit, to: tv)
+        }
+
+        /// Returns false if there was no edit to make.
+        @discardableResult
+        private func apply(_ edit: SmartIndent.Edit?, to tv: NSTextView) -> Bool {
+            guard let edit else { return false }
+            guard tv.shouldChangeText(in: edit.range, replacementString: edit.string) else { return true }
+            tv.textStorage?.replaceCharacters(in: edit.range, with: edit.string)
+            tv.didChangeText()
+            tv.setSelectedRange(edit.selection)
+            tv.scrollRangeToVisible(edit.selection)
+            return true
         }
     }
 }

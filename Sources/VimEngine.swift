@@ -33,6 +33,8 @@ final class VimEngine {
 
     weak var textView: NSTextView?
     var onModeChange: (Mode) -> Void = { _ in }
+    /// `?` outside insert mode: Vim's backward search is not implemented, so it opens the help.
+    var onHelp: () -> Void = {}
     private(set) var mode = Mode.normal
 
     var isEnabled = false {
@@ -122,6 +124,11 @@ final class VimEngine {
         if pendingPrefix == "r" {
             if cursor < lineEnd(cursor) { replace(NSRange(location: cursor, length: 1), with: String(key), cursor: cursor) }
             resetPending()
+            return true
+        }
+        if key == "?" {
+            resetPending()
+            onHelp()
             return true
         }
         let position = isVisual ? head : cursor

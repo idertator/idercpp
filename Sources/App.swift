@@ -35,6 +35,14 @@ struct IderCppApp: App {
                     .keyboardShortcut(".")
                     .disabled(!model.isRunning)
             }
+            CommandGroup(replacing: .help) {
+                Button("Key Bindings") { model.showHelp = true }
+                    .keyboardShortcut("?", modifiers: .command)
+            }
+            CommandGroup(after: .toolbar) {
+                Toggle("Terminal", isOn: $model.showConsole)
+                    .keyboardShortcut("j")
+            }
             CommandMenu("Debug") {
                 Button("Debug") { model.debug() }
                     .keyboardShortcut("d")

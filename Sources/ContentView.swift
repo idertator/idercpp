@@ -17,16 +17,22 @@ struct ContentView: View {
                     completions: { model.completions(for: $0) },
                     vim: model.vimEnabled,
                     onVimMode: { model.vimMode = $0 },
-                    onToggleVim: { model.vimEnabled.toggle() }
+                    onToggleVim: { model.vimEnabled.toggle() },
+                    onHelp: { model.showHelp = true }
                 )
                 .frame(minHeight: 200)
-                console
-                    .frame(minHeight: 120)
+                if model.showConsole {
+                    console
+                        .frame(minHeight: 120)
+                }
             }
             .inspector(isPresented: $model.showDebugger) {
                 DebugSidebar()
                     .inspectorColumnWidth(min: 220, ideal: 280, max: 500)
             }
+        }
+        .sheet(isPresented: $model.showHelp) {
+            HelpView()
         }
         .navigationTitle(model.title)
         .navigationSubtitle(model.vimEnabled ? model.vimMode : "")
@@ -50,6 +56,10 @@ struct ContentView: View {
                 Button { model.stop() } label: { Label("Stop", systemImage: "stop.fill") }
                     .help("Stop (⌘.)")
                     .disabled(!model.isRunning)
+                Button { model.showConsole.toggle() } label: {
+                    Label("Terminal", systemImage: "rectangle.bottomthird.inset.filled")
+                }
+                .help("Show or hide the terminal (⌘J)")
                 Button { model.showDebugger.toggle() } label: { Label("Debugger", systemImage: "sidebar.right") }
                     .help("Show or hide the debugger")
             }
@@ -82,7 +92,8 @@ struct ContentView: View {
             onText: { model.typeInput($0) },
             onDelete: { model.deleteInput() },
             onEOF: { model.sendEOF() },
-            onInterrupt: { model.stop() }
+            onInterrupt: { model.stop() },
+            onHelp: { model.showHelp = true }
         )
     }
 }

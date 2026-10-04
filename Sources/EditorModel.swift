@@ -21,10 +21,50 @@ final class EditorModel: ObservableObject {
 
         """
 
+    private static let lastFolderKey = "lastFolder"
+    private static let lastFileKey = "lastFile"
+
+    /// Starts on the project given as the first argument, or else on the one
+    /// that was open when the app last quit.
+    init() {
+        let fm = FileManager.default
+        func existing(_ path: String?, directory: Bool) -> URL? {
+            var isDirectory: ObjCBool = false
+            guard let path, fm.fileExists(atPath: path, isDirectory: &isDirectory),
+                  isDirectory.boolValue == directory
+            else { return nil }
+            return URL(fileURLWithPath: path, isDirectory: directory)
+        }
+        let defaults = UserDefaults.standard
+        // Launch services add flags such as -NSDocumentRevisionsDebugMode; paths do not start with "-".
+        let argument = CommandLine.arguments.dropFirst().first { !$0.hasPrefix("-") }
+        if let folder = existing(argument, directory: true) {
+            openFolder(folder)
+        } else if let file = existing(argument, directory: false) {
+            load(file)
+        } else if let folder = existing(defaults.string(forKey: Self.lastFolderKey), directory: true) {
+            let file = existing(defaults.string(forKey: Self.lastFileKey), directory: false)
+            // A leftover file from another project does not belong here.
+            openFolder(folder, file: file.flatMap { $0.path.hasPrefix(folder.path + "/") ? $0 : nil })
+        } else if let file = existing(defaults.string(forKey: Self.lastFileKey), directory: false) {
+            load(file)
+        }
+    }
+
     @Published var text = EditorModel.template { didSet { isDirty = true } }
-    @Published var fileURL: URL?
+    @Published var fileURL: URL? {
+        didSet {
+            if let fileURL { UserDefaults.standard.set(fileURL.path, forKey: Self.lastFileKey) }
+        }
+    }
     /// The opened folder is the project: it fills the sidebar and is built as a whole.
-    @Published var folderURL: URL?
+    @Published var folderURL: URL? {
+        didSet {
+            // The file is remembered again once one is opened in the new project.
+            UserDefaults.standard.removeObject(forKey: Self.lastFileKey)
+            UserDefaults.standard.set(folderURL?.path, forKey: Self.lastFolderKey)
+        }
+    }
     @Published var tree: [FileNode] = []
     @Published var isDirty = false
     @Published var output = ""
@@ -34,6 +74,10 @@ final class EditorModel: ObservableObject {
 
     // Debugger state; the logic lives in Debugger.swift.
     @Published var showDebugger = false
+    /// The bottom pane with program output and input.
+    @Published var showConsole = true
+    /// The key bindings sheet.
+    @Published var showHelp = false
     @Published var breakpoints: [SourceLine] = []
     @Published var isDebugging = false
     @Published var isPaused = false
@@ -108,10 +152,10 @@ final class EditorModel: ObservableObject {
         tree = folderURL.map(scan) ?? []
     }
 
-    private func openFolder(_ url: URL) {
+    private func openFolder(_ url: URL, file: URL? = nil) {
         folderURL = url
         reloadTree()
-        let main = url.appendingPathComponent("main.cpp")
+        let main = file ?? url.appendingPathComponent("main.cpp")
         if FileManager.default.fileExists(atPath: main.path) {
             load(main)
         } else {
@@ -128,7 +172,10 @@ final class EditorModel: ObservableObject {
             fileURL = url
             isDirty = false
             // A file opened on its own has its own index; a project has one for all files.
-            if folderURL == nil { loadIndex() }
+            if folderURL == nil {
+                UserDefaults.standard.removeObject(forKey: Self.lastFolderKey)
+                loadIndex()
+            }
         } catch {
             alert("Could not open file", error.localizedDescription)
         }
@@ -207,6 +254,8 @@ final class EditorModel: ObservableObject {
     /// over the binary and the directory to run it in.
     func compile(then: @escaping @MainActor (_ bin: URL, _ cwd: URL) -> Void) {
         guard !isRunning else { return }
+        // Build errors and program output go there: do not leave it hidden.
+        showConsole = true
         // In a project an untouched untitled buffer is not part of the build.
         if folderURL == nil || fileURL != nil || isDirty {
             guard save() else { return }

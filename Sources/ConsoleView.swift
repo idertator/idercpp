@@ -12,6 +12,7 @@ struct ConsoleView: NSViewRepresentable {
     var onDelete: () -> Void = {}
     var onEOF: () -> Void = {}
     var onInterrupt: () -> Void = {}
+    var onHelp: () -> Void = {}
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = ConsoleTextView.scrollableTextView()
@@ -32,6 +33,7 @@ struct ConsoleView: NSViewRepresentable {
         tv.onDelete = onDelete
         tv.onEOF = onEOF
         tv.onInterrupt = onInterrupt
+        tv.onHelp = onHelp
 
         let started = isRunning && !tv.isRunning
         tv.isRunning = isRunning
@@ -64,11 +66,17 @@ final class ConsoleTextView: NSTextView {
     var onDelete: () -> Void = {}
     var onEOF: () -> Void = {}
     var onInterrupt: () -> Void = {}
+    var onHelp: () -> Void = {}
 
     override var acceptsFirstResponder: Bool { true }
 
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags
+        // With no program to talk to, the console has no use for the key.
+        if !isRunning, !flags.contains(.command), event.characters == "?" {
+            onHelp()
+            return
+        }
         guard isRunning, !flags.contains(.command) else {
             super.keyDown(with: event)
             return

@@ -18,6 +18,7 @@ struct CodeEditor: NSViewRepresentable {
     var vim = false
     var onVimMode: (String) -> Void = { _ in }
     var onToggleVim: () -> Void = {}
+    var onHelp: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -28,6 +29,7 @@ struct CodeEditor: NSViewRepresentable {
         tv.vim.textView = tv
         tv.vim.onModeChange = { [coordinator = context.coordinator] in coordinator.parent.onVimMode($0.rawValue) }
         tv.onToggleVim = { [coordinator = context.coordinator] in coordinator.parent.onToggleVim() }
+        tv.vim.onHelp = { [coordinator = context.coordinator] in coordinator.parent.onHelp() }
         tv.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         tv.isRichText = false
         tv.allowsUndo = true

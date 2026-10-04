@@ -83,8 +83,9 @@ release-major-version: _release
 # version written into its Info.plist (the checked-in one keeps a placeholder)
 # and is signed again, since editing the plist breaks the signature. It is
 # zipped with ditto, which keeps the bundle's metadata and signature intact
-# where a plain zip may not. The app is Apple silicon only, so there is one
-# archive.
+# where a plain zip may not. The same signed copy also goes into a compressed
+# .dmg installer, next to a symlink to /Applications to drag it onto. The app
+# is Apple silicon only, so there is one archive and one disk image.
 #
 # A headless `claude` agent writes the release notes from the commit messages
 # since the last tag — grounded in those messages alone, with no tool access,
@@ -129,7 +130,12 @@ _release: build
 	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $${next#v}" "$$plist"; \
 	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $${next#v}" "$$plist"; \
 	codesign --force --sign - "$$outdir/$(APP).app"; \
-	(cd "$$outdir" && ditto -c -k --keepParent "$(APP).app" "$$name.zip" && rm -rf "$(APP).app"); \
+	(cd "$$outdir" && ditto -c -k --keepParent "$(APP).app" "$$name.zip"); \
+	mkdir "$$outdir/dmg"; \
+	mv "$$outdir/$(APP).app" "$$outdir/dmg/"; \
+	ln -s /Applications "$$outdir/dmg/Applications"; \
+	hdiutil create -volname "$(APP)" -srcfolder "$$outdir/dmg" -fs HFS+ -format UDZO -ov -quiet "$$outdir/$$name.dmg"; \
+	rm -rf "$$outdir/dmg"; \
 	(cd "$$outdir" && shasum -a 256 * > SHA256SUMS); \
 	echo "==> writing release notes"; \
 	range="HEAD"; \

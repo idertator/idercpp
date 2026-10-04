@@ -36,7 +36,8 @@ make run        # build and launch
 | `make install` | Copy to `/Applications` for all users (`sudo make install` if not writable) |
 | `make install-user` | Copy to `~/Applications` |
 | `make uninstall` / `make uninstall-user` | Remove the installed copy |
-| `make clean` | Delete `build/` |
+| `make clean` | Delete `build/` and `dist/` |
+| `make release-patch-version` / `-minor-` / `-major-` | Bump the latest `vX.Y.Z` tag, zip the app into `dist/`, tag, push and publish a GitHub release (needs `gh` and `claude`, clean tree) |
 | `make help` | List the targets |
 
 The app is signed ad hoc, which is enough to run it on the Mac that built it.
